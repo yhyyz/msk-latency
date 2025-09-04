@@ -121,12 +121,7 @@ Starting consumer:
 ## 配置说明
 
 ### Kafka 集群配置
-默认连接到以下 MSK 集群：
-```
-uaw.msklogstream.oee1gg.c16.kafka.us-east-1.amazonaws.com:9092
-boot-eo1.msklogstream.oee1gg.c16.kafka.us-east-1.amazonaws.com:9092
-boot-4qw.msklogstream.oee1gg.c16.kafka.us-east-1.amazonaws.com:9092
-```
+
 
 ### 生产者配置
 - `acks=1`: 等待 leader 确认

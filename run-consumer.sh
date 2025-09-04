@@ -1,6 +1,6 @@
 #!/bin/bash
 
-KAFKA_SERVERS="uaw.msklogstream.oee1gg.c16.kafka.us-east-1.amazonaws.com:9092,boot-eo1.msklogstream.oee1gg.c16.kafka.us-east-1.amazonaws.com:9092,boot-4qw.msklogstream.oee1gg.c16.kafka.us-east-1.amazonaws.com:9092"
+KAFKA_SERVERS="xxxx:9092"
 TOPIC_NAME=${1:-"latency-test"}
 GROUP_ID=${2:-"latency-test-group"}
 STATS_INTERVAL=${3:-10}
