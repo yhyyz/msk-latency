@@ -30,6 +30,8 @@ msk-latency/
 
 ```bash
 mvn clean package -DskipTests
+# 编译好的
+wget https://dxs9dnjebzm6y.cloudfront.net/tmp/msk-latency-1.0.0.jar
 ```
 
 ## 使用方法
