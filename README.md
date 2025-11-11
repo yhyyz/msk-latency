@@ -30,6 +30,7 @@ msk-latency/
 
 ```bash
 mvn clean package -DskipTests
+mvn dependency:copy-dependencies -DoutputDirectory=target/lib
 # 编译好的
 wget https://dxs9dnjebzm6y.cloudfront.net/tmp/msk-latency-1.0.0.jar
 ```

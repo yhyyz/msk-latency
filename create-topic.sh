@@ -1,6 +1,6 @@
 #!/bin/bash
 
-KAFKA_SERVERS="uaw.msklogstream.oee1gg.c16.kafka.us-east-1.amazonaws.com:9092,boot-eo1.msklogstream.oee1gg.c16.kafka.us-east-1.amazonaws.com:9092,boot-4qw.msklogstream.oee1gg.c16.kafka.us-east-1.amazonaws.com:9092"
+KAFKA_SERVERS="xxx:9092"
 TOPIC_NAME=${1:-"latency-test"}
 PARTITIONS=${2:-16}
 REPLICATION_FACTOR=${3:-3}
