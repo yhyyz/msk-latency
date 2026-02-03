@@ -32,6 +32,7 @@ msk-latency/
 
 ```bash
 mvn clean package -DskipTests
+mvn clean package -DskipTests dependency:copy-dependencies -DoutputDirectory=target/lib
 ```
 
 ## 使用方法
@@ -197,6 +198,8 @@ Custom Kafka config:
 # 低延迟配置
 ./run-producer.sh --topic my-topic --rate 1000 \
   --config "batch.size=1,linger.ms=0"
+
+./run-producer.sh  --topic latency-test --rate 10000  --threads 1 --acks -1 --config "request.timeout.ms=5000,delivery.timeout.ms=60000,retry.backoff.ms=100,metadata.max.age.ms=60000"
 ```
 
 ### 消费者常用配置
@@ -220,6 +223,8 @@ Custom Kafka config:
 # 调整会话超时
 ./run-consumer.sh --topic my-topic \
   --config "session.timeout.ms=45000,heartbeat.interval.ms=15000"
+
+./run-consumer.sh  --topic latency-test  --group latency-test-group  --stats-interval 5 --offset latest   --config "session.timeout.ms=10000,heartbeat.interval.ms=3000,metadata.max.age.ms=60000"
 ```
 
 ## 延迟计算

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-KAFKA_SERVERS="boot-4qw.msklogstream.oee1gg.c16.kafka.us-east-1.amazonaws.com:9092"
-
+KAFKA_SERVERS="boot-4qw.msklogstream.oee1gg.c16.kafka.us-east-1.amazonaws.com:9092,boot-eo1.msklogstream.oee1gg.c16.kafka.us-east-1.amazonaws.com:9092,boot-uaw.msklogstream.oee1gg.c16.kafka.us-east-1.amazonaws.com:9092"
+#KAFKA_SERVERS="b-1.teststandardxlarge.f7cl3f.c3.kafka.us-east-1.amazonaws.com:9092"
 show_help() {
     echo "Kafka Producer - Latency Test Tool"
     echo ""
