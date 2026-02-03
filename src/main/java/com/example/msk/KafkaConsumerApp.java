@@ -12,6 +12,8 @@ import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -25,29 +27,103 @@ public class KafkaConsumerApp implements CommandLineRunner {
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final ObjectMapper objectMapper = new ObjectMapper();
     
+    private static final String DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092";
+    private static final String DEFAULT_TOPIC = "latency-test";
+    private static final String DEFAULT_GROUP = "latency-test-group";
+    private static final int DEFAULT_STATS_INTERVAL = 10;
+    private static final String DEFAULT_OFFSET = "latest";
+    
     public static void main(String[] args) {
         SpringApplication.run(KafkaConsumerApp.class, args);
     }
     
+    private void printHelp() {
+        System.out.println("Kafka Consumer - Latency Test Tool");
+        System.out.println();
+        System.out.println("Usage: java -jar consumer.jar [OPTIONS]");
+        System.out.println();
+        System.out.println("Options:");
+        System.out.println("  --bootstrap-servers <servers>  Kafka bootstrap servers (default: " + DEFAULT_BOOTSTRAP_SERVERS + ")");
+        System.out.println("  --topic <name>                 Topic name (default: " + DEFAULT_TOPIC + ")");
+        System.out.println("  --group <id>                   Consumer group ID (default: " + DEFAULT_GROUP + ")");
+        System.out.println("  --stats-interval <seconds>     Stats output interval (default: " + DEFAULT_STATS_INTERVAL + ")");
+        System.out.println("  --offset <earliest|latest>     Auto offset reset (default: " + DEFAULT_OFFSET + ")");
+        System.out.println("  --config <k=v,k=v,...>         Custom Kafka consumer config");
+        System.out.println("  --help                         Show this help message");
+        System.out.println();
+        System.out.println("Examples:");
+        System.out.println("  # Basic usage");
+        System.out.println("  java -jar consumer.jar --bootstrap-servers localhost:9092 --topic my-topic");
+        System.out.println();
+        System.out.println("  # With custom group and offset");
+        System.out.println("  java -jar consumer.jar --topic my-topic --group my-group --offset earliest");
+        System.out.println();
+        System.out.println("  # With custom Kafka config");
+        System.out.println("  java -jar consumer.jar --topic my-topic \\");
+        System.out.println("    --config \"max.poll.records=1000,fetch.min.bytes=1024\"");
+        System.out.println();
+        System.out.println("Available --config options (Kafka Consumer configs):");
+        System.out.println("  max.poll.records           Max records per poll (default: 500)");
+        System.out.println("  fetch.min.bytes            Min fetch bytes (default: 1)");
+        System.out.println("  fetch.max.wait.ms          Max fetch wait time in ms (default: 500)");
+        System.out.println("  session.timeout.ms         Session timeout in ms (default: 30000)");
+        System.out.println("  heartbeat.interval.ms      Heartbeat interval in ms (default: 3000)");
+        System.out.println("  enable.auto.commit         Auto commit enabled (default: true)");
+        System.out.println("  auto.commit.interval.ms    Auto commit interval in ms (default: 1000)");
+        System.out.println("  ... and any other Kafka consumer configuration");
+    }
+    
+    private Map<String, String> parseArgs(String[] args) {
+        Map<String, String> params = new HashMap<>();
+        for (int i = 0; i < args.length; i++) {
+            if (args[i].startsWith("--") && i + 1 < args.length && !args[i + 1].startsWith("--")) {
+                params.put(args[i], args[i + 1]);
+                i++;
+            } else if (args[i].startsWith("--")) {
+                params.put(args[i], "");
+            }
+        }
+        return params;
+    }
+    
+    private void applyCustomConfig(Properties props, String configStr) {
+        if (configStr == null || configStr.trim().isEmpty()) {
+            return;
+        }
+        System.out.println("Custom Kafka config:");
+        for (String pair : configStr.split(",")) {
+            String[] kv = pair.split("=", 2);
+            if (kv.length == 2) {
+                String key = kv[0].trim();
+                String value = kv[1].trim();
+                props.put(key, value);
+                System.out.println("  " + key + " = " + value);
+            }
+        }
+    }
+    
     @Override
     public void run(String... args) throws Exception {
-        if (args.length < 3) {
-            System.out.println("Usage: java -jar consumer.jar <bootstrap-servers> <topic> <group-id> [stats-interval-seconds] [auto-offset-reset]");
+        Map<String, String> params = parseArgs(args);
+        
+        if (params.containsKey("--help") || params.containsKey("-h")) {
+            printHelp();
             return;
         }
         
-        String bootstrapServers = args[0];
-        String topic = args[1];
-        String groupId = args[2];
-        int statsInterval = args.length > 3 ? Integer.parseInt(args[3]) : 10;
-        String autoOffsetReset = args.length > 4 ? args[4] : "latest";
+        String bootstrapServers = params.getOrDefault("--bootstrap-servers", DEFAULT_BOOTSTRAP_SERVERS);
+        String topic = params.getOrDefault("--topic", DEFAULT_TOPIC);
+        String groupId = params.getOrDefault("--group", DEFAULT_GROUP);
+        int statsInterval = Integer.parseInt(params.getOrDefault("--stats-interval", String.valueOf(DEFAULT_STATS_INTERVAL)));
+        String autoOffsetReset = params.getOrDefault("--offset", DEFAULT_OFFSET);
+        String customConfig = params.get("--config");
         
         System.out.println("Starting consumer with:");
-        System.out.println("Bootstrap servers: " + bootstrapServers);
-        System.out.println("Topic: " + topic);
-        System.out.println("Group ID: " + groupId);
-        System.out.println("Stats interval: " + statsInterval + " seconds");
-        System.out.println("Auto offset reset: " + autoOffsetReset);
+        System.out.println("  --bootstrap-servers  " + bootstrapServers);
+        System.out.println("  --topic              " + topic);
+        System.out.println("  --group              " + groupId);
+        System.out.println("  --stats-interval     " + statsInterval + " seconds");
+        System.out.println("  --offset             " + autoOffsetReset);
         
         Properties props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
@@ -60,9 +136,10 @@ public class KafkaConsumerApp implements CommandLineRunner {
         props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "30000");
         props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "500");
         
+        applyCustomConfig(props, customConfig);
+        
         ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
         
-        // Stats reporting
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
         executor.scheduleAtFixedRate(() -> {
             LatencyStats.Stats currentStats = stats.getAndReset();
@@ -85,12 +162,11 @@ public class KafkaConsumerApp implements CommandLineRunner {
                 for (ConsumerRecord<String, String> record : records) {
                     try {
                         JsonNode jsonNode = objectMapper.readTree(record.value());
-                        long messageTimestamp = jsonNode.get("timestamp").asLong(); // Already in millis
+                        long messageTimestamp = jsonNode.get("timestamp").asLong();
                         long latency = currentTime - messageTimestamp;
                         
                         stats.addLatency(latency);
                     } catch (Exception e) {
-                        // If parsing fails, just count the message
                         stats.addMessageCount();
                     }
                 }

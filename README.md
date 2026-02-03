@@ -8,7 +8,9 @@
 - 多线程异步生产者，支持自定义发送速率
 - 消费者延迟监控
 - 详细的延迟统计（平均值、最大值、P99、P99.9、P99.99）
-- 命令行参数配置
+- **命名参数支持**（`--topic`, `--rate`, `--config` 等）
+- **自定义 Kafka 配置参数支持**（通过 `--config` 传递）
+- **内置帮助文档**（`--help`）
 
 ## 项目结构
 
@@ -30,12 +32,19 @@ msk-latency/
 
 ```bash
 mvn clean package -DskipTests
-mvn dependency:copy-dependencies -DoutputDirectory=target/lib
-# 编译好的
-wget https://dxs9dnjebzm6y.cloudfront.net/tmp/msk-latency-1.0.0.jar
 ```
 
 ## 使用方法
+
+### 查看帮助
+
+```bash
+# 生产者帮助
+./run-producer.sh --help
+
+# 消费者帮助
+./run-consumer.sh --help
+```
 
 ### 1. 创建 Topic
 
@@ -62,20 +71,38 @@ wget https://dxs9dnjebzm6y.cloudfront.net/tmp/msk-latency-1.0.0.jar
 ./run-producer.sh
 
 # 指定 topic 和发送速率
-./run-producer.sh latency-test 5000
+./run-producer.sh --topic my-topic --rate 5000
 
-# 指定所有参数
-./run-producer.sh latency-test 5000 4 10 1 100 10000
+# 高吞吐量配置
+./run-producer.sh --topic my-topic --rate 10000 --threads 4 \
+  --config "batch.size=65536,linger.ms=10,compression.type=lz4"
+
+# 发送固定数量的消息
+./run-producer.sh --topic my-topic --rate 5000 --total 100000
+
+# 完整参数示例
+./run-producer.sh \
+  --topic latency-test \
+  --rate 5000 \
+  --threads 4 \
+  --stats-interval 10 \
+  --acks 1 \
+  --retries 100 \
+  --total 100000 \
+  --config "batch.size=32768,linger.ms=5"
 ```
 
 **参数说明：**
-- 参数1: Topic 名称（默认: latency-test）
-- 参数2: 每秒发送消息数（默认: 1000）
-- 参数3: 生产者线程数（默认: 1）
-- 参数4: 统计输出间隔秒数（默认: 10）
-- 参数5: Acks 设置（默认: -1，可选: 0, 1, -1/all）
-- 参数6: 重试次数（默认: 2147483647，即 Integer.MAX_VALUE）
-- 参数7: 总消息数（默认: -1 无限制，设置正数则发送指定条数后停止）
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--topic <name>` | Topic 名称 | latency-test |
+| `--rate <n>` | 每秒发送消息数 | 1000 |
+| `--threads <n>` | 生产者线程数 | 1 |
+| `--stats-interval <sec>` | 统计输出间隔秒数 | 10 |
+| `--acks <0\|1\|-1\|all>` | Acks 设置 | -1 |
+| `--retries <n>` | 重试次数 | 2147483647 |
+| `--total <n>` | 总消息数，-1=无限 | -1 |
+| `--config <k=v,...>` | 自定义 Kafka 配置 | - |
 
 ### 3. 启动消费者
 
@@ -84,58 +111,116 @@ wget https://dxs9dnjebzm6y.cloudfront.net/tmp/msk-latency-1.0.0.jar
 ./run-consumer.sh
 
 # 指定 topic 和消费者组
-./run-consumer.sh latency-test my-consumer-group
+./run-consumer.sh --topic my-topic --group my-consumer-group
 
-# 指定所有参数
-./run-consumer.sh latency-test my-consumer-group 5 earliest
+# 从最早位置开始消费
+./run-consumer.sh --topic my-topic --offset earliest
+
+# 使用自定义 Kafka 配置
+./run-consumer.sh --topic my-topic \
+  --config "max.poll.records=1000,fetch.min.bytes=1024"
+
+# 完整参数示例
+./run-consumer.sh \
+  --topic latency-test \
+  --group my-consumer-group \
+  --stats-interval 5 \
+  --offset earliest \
+  --config "max.poll.records=1000,session.timeout.ms=45000"
 ```
 
 **参数说明：**
-- 参数1: Topic 名称（默认: latency-test）
-- 参数2: 消费者组 ID（默认: latency-test-group）
-- 参数3: 统计输出间隔秒数（默认: 10）
-- 参数4: 消费位置（默认: latest，可选: earliest, latest）
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--topic <name>` | Topic 名称 | latency-test |
+| `--group <id>` | 消费者组 ID | latency-test-group |
+| `--stats-interval <sec>` | 统计输出间隔秒数 | 10 |
+| `--offset <earliest\|latest>` | 消费起始位置 | latest |
+| `--config <k=v,...>` | 自定义 Kafka 配置 | - |
 
 ## 输出示例
 
 ### 生产者输出
 ```
-Starting producer:
-  Topic: latency-test
-  Messages per second: 1000
-  Threads: 1
-  Stats interval: 10 seconds
+Starting producer with:
+  --bootstrap-servers  localhost:9092
+  --topic              latency-test
+  --rate               5000
+  --threads            4
+  --stats-interval     10 seconds
+  --acks               -1
+  --retries            2147483647
+  --total              unlimited
+Custom Kafka config:
+  batch.size = 32768
+  linger.ms = 5
 
-[1693574400000] Messages: 10000, Latency samples: 10000, Avg: 2.45ms, Max: 15ms, P99: 8ms, P99.9: 12ms, P99.99: 15ms
+[2024-01-15 10:30:00.123] Messages: 50000, Latency samples: 50000, Avg: 2.45ms, Max: 15ms, P99: 8ms, P99.9: 12ms, P99.99: 15ms
 ```
 
 ### 消费者输出
 ```
-Starting consumer:
-  Topic: latency-test
-  Group ID: latency-test-group
-  Stats interval: 10 seconds
+Starting consumer with:
+  --bootstrap-servers  localhost:9092
+  --topic              latency-test
+  --group              my-consumer-group
+  --stats-interval     10 seconds
+  --offset             latest
+Custom Kafka config:
+  max.poll.records = 1000
 
-[1693574400000] Messages: 9998, Latency samples: 9998, Avg: 5.23ms, Max: 25ms, P99: 18ms, P99.9: 22ms, P99.99: 25ms
+[2024-01-15 10:30:00.123] Messages: 49998, Latency samples: 49998, Avg: 5.23ms, Max: 25ms, P99: 18ms, P99.9: 22ms, P99.99: 25ms
 ```
 
-## 配置说明
+## 自定义 Kafka 配置
 
-### Kafka 集群配置
+通过 `--config` 参数传递自定义 Kafka 配置，格式为 `"key1=value1,key2=value2"`。
 
+自定义配置会**覆盖**默认配置，可以传递任意 Kafka Producer/Consumer 配置项。
 
-### 生产者配置
-- `acks=1`: 等待 leader 确认
-- `retries=3`: 重试次数
-- `batch.size=16384`: 批次大小
-- `linger.ms=1`: 批次等待时间
-- `buffer.memory=33554432`: 缓冲区大小
+### 生产者常用配置
 
-### 消费者配置
-- `auto.offset.reset=latest`: 从最新位置开始消费
-- `enable.auto.commit=true`: 自动提交偏移量
-- `session.timeout.ms=30000`: 会话超时时间
-- `max.poll.records=500`: 单次拉取最大记录数
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| `batch.size` | 批次大小（字节） | 16384 |
+| `linger.ms` | 批次等待时间（毫秒） | 1 |
+| `buffer.memory` | 缓冲区大小（字节） | 33554432 |
+| `compression.type` | 压缩类型 (none/gzip/snappy/lz4/zstd) | none |
+| `max.block.ms` | 最大阻塞时间（毫秒） | 60000 |
+
+**生产者配置示例：**
+```bash
+# 高吞吐量配置
+./run-producer.sh --topic my-topic --rate 10000 \
+  --config "batch.size=65536,linger.ms=10,compression.type=lz4"
+
+# 低延迟配置
+./run-producer.sh --topic my-topic --rate 1000 \
+  --config "batch.size=1,linger.ms=0"
+```
+
+### 消费者常用配置
+
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| `max.poll.records` | 单次拉取最大记录数 | 500 |
+| `fetch.min.bytes` | 最小拉取字节数 | 1 |
+| `fetch.max.wait.ms` | 最大拉取等待时间（毫秒） | 500 |
+| `session.timeout.ms` | 会话超时时间（毫秒） | 30000 |
+| `heartbeat.interval.ms` | 心跳间隔（毫秒） | 3000 |
+| `enable.auto.commit` | 自动提交偏移量 | true |
+| `auto.commit.interval.ms` | 自动提交间隔（毫秒） | 1000 |
+
+**消费者配置示例：**
+```bash
+# 高吞吐量配置
+./run-consumer.sh --topic my-topic \
+  --config "max.poll.records=1000,fetch.min.bytes=1024"
+
+# 调整会话超时
+./run-consumer.sh --topic my-topic \
+  --config "session.timeout.ms=45000,heartbeat.interval.ms=15000"
+```
 
 ## 延迟计算
 
@@ -148,7 +233,7 @@ Starting consumer:
 {
   "threadId": 0,
   "messageId": 1234,
-  "timestamp": 1693574400000000000,
+  "timestamp": 1693574400000,
   "data": "sample-data-0-1234"
 }
 ```
@@ -156,14 +241,16 @@ Starting consumer:
 ## 性能调优建议
 
 ### 提高吞吐量
-1. 增加生产者线程数
+1. 增加生产者线程数 (`--threads`)
 2. 调整 `batch.size` 和 `linger.ms`
-3. 增加分区数以支持更多并行度
+3. 启用压缩 (`compression.type=lz4`)
+4. 增加分区数以支持更多并行度
 
 ### 降低延迟
 1. 减少 `linger.ms` 值
-2. 使用 `acks=1` 而不是 `acks=all`
-3. 调整 JVM 堆大小和 GC 参数
+2. 使用 `--acks 1` 而不是 `-1`
+3. 减小 `batch.size`
+4. 调整 JVM 堆大小和 GC 参数
 
 ### 监控指标
 - 消息发送速率 (messages/second)
@@ -201,4 +288,3 @@ logging.level.com.example.msk=DEBUG
 - Spring Boot: 2.7.0
 - Kafka Client: 3.1.0
 - Jackson: 2.13.3
-
